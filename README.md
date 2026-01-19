@@ -1,4 +1,4 @@
-# LangGraph Style AI Agent Framework
+# LangGraph Style AI Agent Framework for AIops
 
 Azure SDK 및 Microsoft Agent Framework를 기반으로 구현한 LangGraph 스타일의 AI 에이전트 프레임워크입니다.
 
