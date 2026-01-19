@@ -1,0 +1,76 @@
+{
+  "UserConfig": {
+    "Namespaces": [
+      {
+        "Name": "agent-namespace",
+        "Queues": [
+          {
+            "Name": "agent-tasks",
+            "Properties": {
+              "DeadLetteringOnMessageExpiration": true,
+              "DefaultMessageTimeToLive": "PT1H",
+              "DuplicateDetectionHistoryTimeWindow": "PT10M",
+              "LockDuration": "PT1M",
+              "MaxDeliveryCount": 10,
+              "RequiresDuplicateDetection": true
+            }
+          },
+          {
+            "Name": "agent-results",
+            "Properties": {
+              "DeadLetteringOnMessageExpiration": true,
+              "DefaultMessageTimeToLive": "PT24H",
+              "MaxDeliveryCount": 5
+            }
+          },
+          {
+            "Name": "agent-events",
+            "Properties": {
+              "DefaultMessageTimeToLive": "PT1H",
+              "MaxDeliveryCount": 3
+            }
+          }
+        ],
+        "Topics": [
+          {
+            "Name": "agent-notifications",
+            "Properties": {
+              "DefaultMessageTimeToLive": "PT1H",
+              "DuplicateDetectionHistoryTimeWindow": "PT10M"
+            },
+            "Subscriptions": [
+              {
+                "Name": "all-notifications",
+                "Properties": {
+                  "DeadLetteringOnMessageExpiration": true,
+                  "DefaultMessageTimeToLive": "PT1H",
+                  "LockDuration": "PT1M",
+                  "MaxDeliveryCount": 5
+                }
+              },
+              {
+                "Name": "error-notifications",
+                "Properties": {
+                  "DefaultMessageTimeToLive": "PT24H",
+                  "MaxDeliveryCount": 10
+                },
+                "Rules": [
+                  {
+                    "Name": "error-filter",
+                    "Properties": {
+                      "FilterType": "Sql",
+                      "SqlExpression": "level = 'error'"
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    "Logging": {
+      "Type": "File"
+    }
+  }
+}

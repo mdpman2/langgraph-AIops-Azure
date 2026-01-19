@@ -1,0 +1,827 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <!-- 보안: CSP 헤더로 XSS 공격 방지 -->
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; connect-src 'self'; img-src 'self' data:;">
+    <meta http-equiv="X-Content-Type-Options" content="nosniff">
+    <meta http-equiv="X-Frame-Options" content="DENY">
+    <meta name="referrer" content="strict-origin-when-cross-origin">
+    <title>LangGraph AI Agent</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* Header */
+        .header {
+            background: rgba(255, 255, 255, 0.05);
+            backdrop-filter: blur(10px);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            padding: 1rem 2rem;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .logo-icon {
+            width: 40px;
+            height: 40px;
+            background: linear-gradient(135deg, #00d4ff, #7c3aed);
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 20px;
+        }
+
+        .logo-text {
+            color: #fff;
+            font-size: 1.25rem;
+            font-weight: 600;
+        }
+
+        .logo-badge {
+            background: linear-gradient(135deg, #00d4ff, #7c3aed);
+            color: #fff;
+            font-size: 0.7rem;
+            padding: 4px 8px;
+            border-radius: 20px;
+            font-weight: 500;
+        }
+
+        .status-indicator {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            color: rgba(255, 255, 255, 0.7);
+            font-size: 0.875rem;
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            background: #10b981;
+            border-radius: 50%;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        /* Main Container */
+        .main-container {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            max-width: 900px;
+            width: 100%;
+            margin: 0 auto;
+            padding: 2rem;
+        }
+
+        /* Chat Container */
+        .chat-container {
+            flex: 1;
+            overflow-y: auto;
+            padding: 1rem;
+            display: flex;
+            flex-direction: column;
+            gap: 1.5rem;
+        }
+
+        /* Welcome Message */
+        .welcome-message {
+            text-align: center;
+            padding: 3rem 2rem;
+        }
+
+        .welcome-icon {
+            font-size: 4rem;
+            margin-bottom: 1rem;
+        }
+
+        .welcome-title {
+            color: #fff;
+            font-size: 1.75rem;
+            font-weight: 700;
+            margin-bottom: 0.5rem;
+        }
+
+        .welcome-subtitle {
+            color: rgba(255, 255, 255, 0.6);
+            font-size: 1rem;
+            max-width: 500px;
+            margin: 0 auto 2rem;
+            line-height: 1.6;
+        }
+
+        .suggestion-chips {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.75rem;
+            justify-content: center;
+        }
+
+        .suggestion-chip {
+            background: rgba(255, 255, 255, 0.08);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            color: rgba(255, 255, 255, 0.85);
+            padding: 0.75rem 1.25rem;
+            border-radius: 25px;
+            font-size: 0.875rem;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .suggestion-chip:hover {
+            background: rgba(255, 255, 255, 0.15);
+            border-color: rgba(0, 212, 255, 0.5);
+            transform: translateY(-2px);
+        }
+
+        /* Messages */
+        .message {
+            display: flex;
+            gap: 1rem;
+            max-width: 85%;
+            animation: fadeIn 0.3s ease;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .message.user {
+            align-self: flex-end;
+            flex-direction: row-reverse;
+        }
+
+        .message-avatar {
+            width: 36px;
+            height: 36px;
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1rem;
+            flex-shrink: 0;
+        }
+
+        .message.assistant .message-avatar {
+            background: linear-gradient(135deg, #00d4ff, #7c3aed);
+        }
+
+        .message.user .message-avatar {
+            background: rgba(255, 255, 255, 0.15);
+        }
+
+        .message-content {
+            background: rgba(255, 255, 255, 0.08);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 16px;
+            padding: 1rem 1.25rem;
+            color: #fff;
+            line-height: 1.6;
+        }
+
+        .message.user .message-content {
+            background: linear-gradient(135deg, #7c3aed, #5b21b6);
+            border: none;
+        }
+
+        .message-content p {
+            margin-bottom: 0.75rem;
+        }
+
+        .message-content p:last-child {
+            margin-bottom: 0;
+        }
+
+        .message-content code {
+            background: rgba(0, 0, 0, 0.3);
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-family: 'Fira Code', monospace;
+            font-size: 0.875em;
+        }
+
+        .message-content pre {
+            background: rgba(0, 0, 0, 0.4);
+            padding: 1rem;
+            border-radius: 8px;
+            overflow-x: auto;
+            margin: 0.75rem 0;
+        }
+
+        .message-content pre code {
+            background: none;
+            padding: 0;
+        }
+
+        .message-content ul, .message-content ol {
+            margin-left: 1.5rem;
+            margin-bottom: 0.75rem;
+        }
+
+        .message-content h1, .message-content h2, .message-content h3 {
+            margin: 1rem 0 0.5rem;
+            color: #00d4ff;
+        }
+
+        /* Loading indicator */
+        .loading {
+            display: flex;
+            gap: 4px;
+            padding: 0.5rem;
+        }
+
+        .loading-dot {
+            width: 8px;
+            height: 8px;
+            background: rgba(255, 255, 255, 0.6);
+            border-radius: 50%;
+            animation: bounce 1.4s infinite ease-in-out both;
+        }
+
+        .loading-dot:nth-child(1) { animation-delay: -0.32s; }
+        .loading-dot:nth-child(2) { animation-delay: -0.16s; }
+
+        @keyframes bounce {
+            0%, 80%, 100% { transform: scale(0); }
+            40% { transform: scale(1); }
+        }
+
+        /* Streaming Styles */
+        .streaming-status {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 0.5rem 0;
+            color: #00d4ff;
+            font-weight: 500;
+        }
+
+        .status-icon {
+            font-size: 1.25rem;
+            animation: pulse 1s infinite;
+        }
+
+        .streaming-stages {
+            margin-top: 0.75rem;
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+
+        .stage-item {
+            background: rgba(0, 0, 0, 0.2);
+            border-left: 3px solid #00d4ff;
+            padding: 0.5rem 0.75rem;
+            border-radius: 0 8px 8px 0;
+            font-size: 0.875rem;
+            color: rgba(255, 255, 255, 0.9);
+            animation: slideIn 0.3s ease;
+        }
+
+        @keyframes slideIn {
+            from { opacity: 0; transform: translateX(-10px); }
+            to { opacity: 1; transform: translateX(0); }
+        }
+
+        .stage-item strong {
+            color: #00d4ff;
+        }
+
+        .stage-item small {
+            color: rgba(255, 255, 255, 0.6);
+            display: block;
+            margin-top: 0.25rem;
+        }
+
+        .streaming-result {
+            margin-top: 1rem;
+            padding-top: 1rem;
+            border-top: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        /* Input Area */
+        .input-area {
+            padding: 1.5rem;
+            background: rgba(255, 255, 255, 0.03);
+            border-top: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 0 0 20px 20px;
+        }
+
+        .input-container {
+            display: flex;
+            gap: 1rem;
+            align-items: flex-end;
+        }
+
+        .input-wrapper {
+            flex: 1;
+            position: relative;
+        }
+
+        #userInput {
+            width: 100%;
+            background: rgba(255, 255, 255, 0.08);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            border-radius: 16px;
+            padding: 1rem 1.25rem;
+            color: #fff;
+            font-size: 1rem;
+            font-family: inherit;
+            resize: none;
+            min-height: 56px;
+            max-height: 200px;
+            transition: all 0.2s ease;
+        }
+
+        #userInput:focus {
+            outline: none;
+            border-color: rgba(0, 212, 255, 0.5);
+            background: rgba(255, 255, 255, 0.1);
+        }
+
+        #userInput::placeholder {
+            color: rgba(255, 255, 255, 0.4);
+        }
+
+        .send-button {
+            width: 56px;
+            height: 56px;
+            background: linear-gradient(135deg, #00d4ff, #7c3aed);
+            border: none;
+            border-radius: 16px;
+            color: #fff;
+            font-size: 1.25rem;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .send-button:hover:not(:disabled) {
+            transform: scale(1.05);
+            box-shadow: 0 8px 25px rgba(0, 212, 255, 0.3);
+        }
+
+        .send-button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        /* Scrollbar */
+        .chat-container::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        .chat-container::-webkit-scrollbar-track {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 3px;
+        }
+
+        .chat-container::-webkit-scrollbar-thumb {
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 3px;
+        }
+
+        .chat-container::-webkit-scrollbar-thumb:hover {
+            background: rgba(255, 255, 255, 0.3);
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .main-container {
+                padding: 1rem;
+            }
+
+            .header {
+                padding: 1rem;
+            }
+
+            .logo-text {
+                display: none;
+            }
+
+            .message {
+                max-width: 95%;
+            }
+
+            .suggestion-chips {
+                flex-direction: column;
+            }
+
+            .suggestion-chip {
+                text-align: center;
+            }
+        }
+    </style>
+</head>
+<body>
+    <header class="header">
+        <div class="logo">
+            <div class="logo-icon">🤖</div>
+            <span class="logo-text">LangGraph AI Agent</span>
+            <span class="logo-badge">Azure</span>
+        </div>
+        <div class="status-indicator">
+            <span class="status-dot"></span>
+            <span>Connected</span>
+        </div>
+    </header>
+
+    <main class="main-container">
+        <div class="chat-container" id="chatContainer">
+            <div class="welcome-message" id="welcomeMessage">
+                <div class="welcome-icon">🧠</div>
+                <h1 class="welcome-title">LangGraph AI Agent</h1>
+                <p class="welcome-subtitle">
+                    계획(Planning), 실행(Execution), 반성(Reflection), 결정(Decision)의
+                    워크플로우를 통해 복잡한 질문에 답변하는 AI 에이전트입니다.
+                </p>
+                <div class="suggestion-chips">
+                    <button class="suggestion-chip" onclick="sendSuggestion('Azure Container Apps의 장점을 설명해주세요')">
+                        ☁️ Azure Container Apps 장점
+                    </button>
+                    <button class="suggestion-chip" onclick="sendSuggestion('REST API 설계 시 best practice를 알려주세요')">
+                        🔧 REST API Best Practice
+                    </button>
+                    <button class="suggestion-chip" onclick="sendSuggestion('Python으로 간단한 웹 크롤러 코드를 작성해주세요')">
+                        🐍 Python 웹 크롤러
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <div class="input-area">
+            <div class="input-container">
+                <div class="input-wrapper">
+                    <textarea
+                        id="userInput"
+                        placeholder="메시지를 입력하세요..."
+                        rows="1"
+                        onkeydown="handleKeyDown(event)"
+                    ></textarea>
+                </div>
+                <button class="send-button" id="sendButton" onclick="sendMessage()">
+                    ➤
+                </button>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        const chatContainer = document.getElementById('chatContainer');
+        const userInput = document.getElementById('userInput');
+        const sendButton = document.getElementById('sendButton');
+        const welcomeMessage = document.getElementById('welcomeMessage');
+
+        // Auto-resize textarea
+        userInput.addEventListener('input', function() {
+            this.style.height = 'auto';
+            this.style.height = Math.min(this.scrollHeight, 200) + 'px';
+        });
+
+        function handleKeyDown(event) {
+            if (event.key === 'Enter' && !event.shiftKey) {
+                event.preventDefault();
+                sendMessage();
+            }
+        }
+
+        function sendSuggestion(text) {
+            userInput.value = text;
+            sendMessage();
+        }
+
+        function addMessage(content, isUser = false) {
+            // Hide welcome message
+            if (welcomeMessage) {
+                welcomeMessage.style.display = 'none';
+            }
+
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `message ${isUser ? 'user' : 'assistant'}`;
+
+            const avatar = document.createElement('div');
+            avatar.className = 'message-avatar';
+            avatar.textContent = isUser ? '👤' : '🤖';
+
+            const contentDiv = document.createElement('div');
+            contentDiv.className = 'message-content';
+            contentDiv.innerHTML = formatMessage(content);
+
+            messageDiv.appendChild(avatar);
+            messageDiv.appendChild(contentDiv);
+            chatContainer.appendChild(messageDiv);
+
+            chatContainer.scrollTop = chatContainer.scrollHeight;
+            return messageDiv;
+        }
+
+        function addStreamingMessage() {
+            // Hide welcome message
+            if (welcomeMessage) {
+                welcomeMessage.style.display = 'none';
+            }
+
+            const messageDiv = document.createElement('div');
+            messageDiv.className = 'message assistant';
+            messageDiv.id = 'streamingMessage';
+
+            const avatar = document.createElement('div');
+            avatar.className = 'message-avatar';
+            avatar.textContent = '🤖';
+
+            const contentDiv = document.createElement('div');
+            contentDiv.className = 'message-content';
+            contentDiv.id = 'streamingContent';
+            contentDiv.innerHTML = `
+                <div class="streaming-status" id="streamingStatus">
+                    <span class="status-icon">⏳</span>
+                    <span class="status-text">연결 중...</span>
+                </div>
+                <div class="streaming-stages" id="streamingStages"></div>
+                <div class="streaming-result" id="streamingResult" style="display:none;"></div>
+            `;
+
+            messageDiv.appendChild(avatar);
+            messageDiv.appendChild(contentDiv);
+            chatContainer.appendChild(messageDiv);
+            chatContainer.scrollTop = chatContainer.scrollHeight;
+            return messageDiv;
+        }
+
+        function updateStreamingStatus(icon, text) {
+            const statusDiv = document.getElementById('streamingStatus');
+            if (statusDiv) {
+                statusDiv.innerHTML = `<span class="status-icon">${icon}</span><span class="status-text">${text}</span>`;
+            }
+            chatContainer.scrollTop = chatContainer.scrollHeight;
+        }
+
+        function addStreamingStage(stage) {
+            const stagesDiv = document.getElementById('streamingStages');
+            if (stagesDiv) {
+                const stageDiv = document.createElement('div');
+                stageDiv.className = 'stage-item';
+                // 보안: 신뢰할 수 있는 서버 응답만 innerHTML로 처리
+                // 서버 응답은 미리 정의된 형식만 허용
+                const sanitizedStage = stage
+                    .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
+                    .replace(/on\w+\s*=/gi, '');
+                stageDiv.innerHTML = sanitizedStage;
+                stagesDiv.appendChild(stageDiv);
+            }
+            chatContainer.scrollTop = chatContainer.scrollHeight;
+        }
+
+        function showStreamingResult(result) {
+            const statusDiv = document.getElementById('streamingStatus');
+            const stagesDiv = document.getElementById('streamingStages');
+            const resultDiv = document.getElementById('streamingResult');
+
+            if (statusDiv) statusDiv.style.display = 'none';
+            if (stagesDiv) stagesDiv.style.display = 'none';
+            if (resultDiv) {
+                resultDiv.style.display = 'block';
+                resultDiv.innerHTML = formatMessage(result);
+            }
+            chatContainer.scrollTop = chatContainer.scrollHeight;
+        }
+
+        function removeStreamingMessage() {
+            const streamingMessage = document.getElementById('streamingMessage');
+            if (streamingMessage) {
+                streamingMessage.remove();
+            }
+        }
+
+        // 보안: HTML 특수문자 이스케이프 함수 (XSS 방지)
+        function escapeHtml(text) {
+            if (!text) return '';
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        // 보안: URL 검증 함수
+        function isValidUrl(string) {
+            try {
+                const url = new URL(string);
+                return ['http:', 'https:'].includes(url.protocol);
+            } catch (_) {
+                return false;
+            }
+        }
+
+        function formatMessage(text) {
+            if (!text) return '';
+
+            // 보안: 먼저 HTML 특수문자를 이스케이프
+            let formatted = escapeHtml(text);
+
+            // Convert markdown-like syntax to HTML (이스케이프된 텍스트에서 안전하게 처리)
+            formatted = formatted
+                // Code blocks
+                .replace(/```(\w+)?\n([\s\S]*?)```/g, '<pre><code>$2</code></pre>')
+                // Inline code
+                .replace(/`([^`]+)`/g, '<code>$1</code>')
+                // Bold
+                .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
+                // Italic
+                .replace(/\*([^*]+)\*/g, '<em>$1</em>')
+                // Headers
+                .replace(/^### (.+)$/gm, '<h3>$1</h3>')
+                .replace(/^## (.+)$/gm, '<h2>$1</h2>')
+                .replace(/^# (.+)$/gm, '<h1>$1</h1>')
+                // Line breaks
+                .replace(/\n/g, '<br>');
+
+            return formatted;
+        }
+
+        async function sendMessage() {
+            const message = userInput.value.trim();
+            if (!message) return;
+
+            // Disable input
+            userInput.value = '';
+            userInput.style.height = 'auto';
+            sendButton.disabled = true;
+
+            // Add user message
+            addMessage(message, true);
+
+            // Add streaming message container
+            addStreamingMessage();
+
+            try {
+                const response = await fetch('/agent/stream', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ request: message }),
+                });
+
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+
+                const reader = response.body.getReader();
+                const decoder = new TextDecoder();
+                let buffer = '';
+                let finalResult = '';
+
+                while (true) {
+                    const { done, value } = await reader.read();
+                    if (done) break;
+
+                    buffer += decoder.decode(value, { stream: true });
+                    const lines = buffer.split('\n\n');
+                    buffer = lines.pop() || '';
+
+                    for (const line of lines) {
+                        if (line.startsWith('data: ')) {
+                            try {
+                                const data = JSON.parse(line.slice(6));
+                                console.log('Stream event:', data);  // 디버깅용
+                                handleStreamEvent(data);
+                                if (data.type === 'complete') {
+                                    finalResult = data.result || '결과가 생성되지 않았습니다.';
+                                }
+                            } catch (e) {
+                                console.error('JSON parse error:', e, line);
+                            }
+                        }
+                    }
+                }
+
+                // 남은 버퍼 처리
+                if (buffer.startsWith('data: ')) {
+                    try {
+                        const data = JSON.parse(buffer.slice(6));
+                        handleStreamEvent(data);
+                        if (data.type === 'complete') {
+                            finalResult = data.result || '결과가 생성되지 않았습니다.';
+                        }
+                    } catch (e) {
+                        console.error('Final buffer parse error:', e);
+                    }
+                }
+
+                // Show final result
+                if (finalResult) {
+                    showStreamingResult(finalResult);
+                } else {
+                    showStreamingResult('응답을 받지 못했습니다. 다시 시도해 주세요.');
+                }
+
+            } catch (error) {
+                removeStreamingMessage();
+                addMessage(`❌ 서버 연결 오류: ${error.message}`);
+            }
+
+            sendButton.disabled = false;
+            userInput.focus();
+        }
+
+        function handleStreamEvent(data) {
+            // 보안: 서버 데이터의 문자열 값은 이스케이프 처리
+            const safeEscape = (str) => str ? escapeHtml(String(str)) : '';
+            const safeNumber = (num) => typeof num === 'number' ? num : 0;
+
+            switch (data.type) {
+                case 'start':
+                    updateStreamingStatus('🚀', safeEscape(data.message) || '시작...');
+                    break;
+                case 'stage':
+                    updateStreamingStatus(getStageIcon(data.stage), safeEscape(data.message));
+                    break;
+                case 'plan':
+                    // plan 이벤트: goal과 steps 배열을 가짐
+                    if (data.goal) {
+                        addStreamingStage(`📋 <strong>목표:</strong> ${safeEscape(data.goal)}`);
+                    }
+                    if (data.steps && Array.isArray(data.steps)) {
+                        data.steps.forEach(s => {
+                            addStreamingStage(`  📍 단계 ${safeNumber(s.step)}: ${safeEscape(s.description)}`);
+                        });
+                    }
+                    break;
+                case 'step':
+                    addStreamingStage(`⚡ <strong>단계 ${safeNumber(data.step_number)}:</strong> ${safeEscape(data.description)} [${safeEscape(data.status)}]`);
+                    break;
+                case 'execution_result':
+                    const success = data.success ? '✅' : '❌';
+                    addStreamingStage(`${success} <strong>실행 결과:</strong><br><small>${safeEscape(truncateText(data.output, 300))}</small>`);
+                    break;
+                case 'reflection':
+                    // reflection 이벤트: quality_score, goal_alignment, completeness
+                    addStreamingStage(`🔍 <strong>분석 결과:</strong> 품질=${(safeNumber(data.quality_score)*100).toFixed(0)}%, 정렬=${(safeNumber(data.goal_alignment)*100).toFixed(0)}%, 완성도=${(safeNumber(data.completeness)*100).toFixed(0)}%`);
+                    break;
+                case 'decision':
+                    const decisionIcon = data.decision_type === 'complete' ? '✅' : (data.decision_type === 'continue' ? '🔄' : '❌');
+                    addStreamingStage(`${decisionIcon} <strong>결정:</strong> ${safeEscape(data.decision_type)} - ${safeEscape(data.reasoning)}`);
+                    break;
+                case 'error':
+                    updateStreamingStatus('❌', `오류: ${safeEscape(data.message)}`);
+                    addStreamingStage(`❌ <strong>오류:</strong> ${safeEscape(data.message)}`);
+                    break;
+                case 'complete':
+                    updateStreamingStatus('✅', '완료!');
+                    break;
+                default:
+                    console.log('Unknown event type:', data.type, data);
+            }
+        }
+
+        function getStageIcon(stage) {
+            const icons = {
+                'planning': '📋',
+                'execution': '⚙️',
+                'reflection': '🔍',
+                'decision': '🎯'
+            };
+            return icons[stage] || '🔄';
+        }
+
+        function truncateText(text, maxLength) {
+            if (!text) return '';
+            if (text.length <= maxLength) return text;
+            return text.substring(0, maxLength) + '...';
+        }
+
+        // Focus input on load
+        userInput.focus();
+    </script>
+</body>
+</html>

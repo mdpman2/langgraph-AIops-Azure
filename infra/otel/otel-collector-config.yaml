@@ -1,0 +1,80 @@
+# OpenTelemetry Collector Configuration
+# Azure Monitor / Application Insights로 원격 분석 데이터 전송
+
+receivers:
+  otlp:
+    protocols:
+      grpc:
+        endpoint: 0.0.0.0:4317
+      http:
+        endpoint: 0.0.0.0:4318
+
+processors:
+  batch:
+    timeout: 10s
+    send_batch_size: 1000
+    send_batch_max_size: 1024
+
+  memory_limiter:
+    check_interval: 1s
+    limit_mib: 512
+    spike_limit_mib: 128
+
+  resourcedetection:
+    detectors: [env, system]
+    timeout: 2s
+    override: false
+
+  attributes:
+    actions:
+      - key: environment
+        value: ${ENVIRONMENT:-local}
+        action: upsert
+      - key: service.version
+        value: ${SERVICE_VERSION:-dev}
+        action: upsert
+
+exporters:
+  # Azure Monitor / Application Insights Exporter
+  azuremonitor:
+    connection_string: ${APPLICATIONINSIGHTS_CONNECTION_STRING}
+    maxbatchsize: 100
+    maxbatchinterval: 10s
+
+  # 로컬 디버깅용 콘솔 출력
+  debug:
+    verbosity: detailed
+    sampling_initial: 5
+    sampling_thereafter: 200
+
+extensions:
+  health_check:
+    endpoint: 0.0.0.0:13133
+
+  zpages:
+    endpoint: 0.0.0.0:55679
+
+service:
+  extensions: [health_check, zpages]
+
+  pipelines:
+    traces:
+      receivers: [otlp]
+      processors: [memory_limiter, resourcedetection, attributes, batch]
+      exporters: [azuremonitor, debug]
+
+    metrics:
+      receivers: [otlp]
+      processors: [memory_limiter, resourcedetection, attributes, batch]
+      exporters: [azuremonitor, debug]
+
+    logs:
+      receivers: [otlp]
+      processors: [memory_limiter, resourcedetection, attributes, batch]
+      exporters: [azuremonitor, debug]
+
+  telemetry:
+    logs:
+      level: info
+    metrics:
+      address: 0.0.0.0:8888

@@ -1,3 +1,42 @@
+Metadata-Version: 2.4
+Name: langgraph-agent-framework
+Version: 0.1.0
+Summary: LangGraph-style AI Agent with Planning-Execution-Reflection-Decision workflow on Azure AI Foundry
+Author-email: Your Name <your.email@example.com>
+License: MIT
+Keywords: ai-agent,langgraph,azure,workflow,microsoft-foundry
+Classifier: Development Status :: 3 - Alpha
+Classifier: Intended Audience :: Developers
+Classifier: License :: OSI Approved :: MIT License
+Classifier: Programming Language :: Python :: 3.10
+Classifier: Programming Language :: Python :: 3.11
+Classifier: Programming Language :: Python :: 3.12
+Requires-Python: >=3.10
+Description-Content-Type: text/markdown
+Requires-Dist: agent-framework-azure-ai
+Requires-Dist: azure-identity
+Requires-Dist: azure-ai-projects
+Requires-Dist: azure-core
+Requires-Dist: pydantic>=2.0.0
+Requires-Dist: pydantic-settings>=2.0.0
+Requires-Dist: openai
+Requires-Dist: python-dotenv
+Requires-Dist: structlog
+Requires-Dist: rich
+Requires-Dist: tenacity
+Requires-Dist: aiohttp
+Provides-Extra: dev
+Requires-Dist: pytest; extra == "dev"
+Requires-Dist: pytest-asyncio; extra == "dev"
+Requires-Dist: pytest-cov; extra == "dev"
+Requires-Dist: black; extra == "dev"
+Requires-Dist: ruff; extra == "dev"
+Requires-Dist: mypy; extra == "dev"
+Provides-Extra: monitoring
+Requires-Dist: azure-monitor-opentelemetry; extra == "monitoring"
+Requires-Dist: opentelemetry-api; extra == "monitoring"
+Requires-Dist: opentelemetry-sdk; extra == "monitoring"
+
 # LangGraph Style AI Agent Framework
 
 Azure SDK 및 Microsoft Agent Framework를 기반으로 구현한 LangGraph 스타일의 AI 에이전트 프레임워크입니다.
@@ -211,12 +250,9 @@ AZURE_OPENAI_API_KEY=your-api-key
 AZURE_OPENAI_DEPLOYMENT_NAME=gpt-4.1
 ```
 
-### 3. 패키지 설치 및 실행
+### 3. 실행
 
 ```bash
-# 패키지 설치 (필수 - 최초 1회)
-pip install -e .
-
 # CLI로 실행
 python -m langgraph_agent.main
 

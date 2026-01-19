@@ -1,0 +1,124 @@
+# Docker Compose for local development and testing
+# Azure 기반 로컬 개발 환경 - Azure Emulators 사용
+version: '3.8'
+
+services:
+  # Main AI Agent Service
+  langgraph-agent:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: development
+    container_name: langgraph-agent
+    ports:
+      - "8080:8080"
+    environment:
+      # Azure AI Foundry
+      - AZURE_FOUNDRY_PROJECT_ENDPOINT=${AZURE_FOUNDRY_PROJECT_ENDPOINT}
+      - AZURE_FOUNDRY_MODEL_DEPLOYMENT=${AZURE_FOUNDRY_MODEL_DEPLOYMENT:-gpt-4.1}
+      # Azure OpenAI (Alternative)
+      - AZURE_OPENAI_ENDPOINT=${AZURE_OPENAI_ENDPOINT}
+      - AZURE_OPENAI_API_KEY=${AZURE_OPENAI_API_KEY}
+      - AZURE_OPENAI_DEPLOYMENT_NAME=${AZURE_OPENAI_DEPLOYMENT_NAME:-gpt-4.1}
+      # Agent Configuration
+      - MAX_REFLECTION_ITERATIONS=${MAX_REFLECTION_ITERATIONS:-3}
+      - MAX_PLANNING_DEPTH=${MAX_PLANNING_DEPTH:-5}
+      # Azure Storage (Azurite for local)
+      - AZURE_STORAGE_CONNECTION_STRING=DefaultEndpointsProtocol=http;AccountName=devstoreaccount1;AccountKey=Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==;BlobEndpoint=http://azurite:10000/devstoreaccount1;QueueEndpoint=http://azurite:10001/devstoreaccount1;TableEndpoint=http://azurite:10002/devstoreaccount1;
+      # Azure Cosmos DB (Emulator for local)
+      - AZURE_COSMOS_ENDPOINT=https://cosmosdb:8081
+      - AZURE_COSMOS_KEY=C2y6yDjf5/R+ob0N8A7Cgv30VRDJIWEHLM+4QDU5DE2nQ9nDuVTqobD4b8mGGyPMbIZnqyMsEcaGQy67XIw/Jw==
+      # Azure Application Insights (OpenTelemetry)
+      - APPLICATIONINSIGHTS_CONNECTION_STRING=${APPLICATIONINSIGHTS_CONNECTION_STRING}
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4317
+      - OTEL_SERVICE_NAME=langgraph-agent
+    volumes:
+      - ./src:/app/src:ro
+      - ./tests:/app/tests:ro
+      - agent-logs:/app/logs
+    networks:
+      - agent-network
+    depends_on:
+      - azurite
+      - cosmosdb
+      - otel-collector
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+  # Azurite - Azure Storage Emulator (for local state persistence)
+  azurite:
+    image: mcr.microsoft.com/azure-storage/azurite:latest
+    container_name: azurite
+    ports:
+      - "10000:10000"  # Blob
+      - "10001:10001"  # Queue
+      - "10002:10002"  # Table
+    volumes:
+      - azurite-data:/data
+    networks:
+      - agent-network
+    command: ["azurite", "--blobHost", "0.0.0.0", "--queueHost", "0.0.0.0", "--tableHost", "0.0.0.0", "--loose"]
+
+  # Azure Cosmos DB Emulator (Linux 지원)
+  cosmosdb:
+    image: mcr.microsoft.com/cosmosdb/linux/azure-cosmos-emulator:latest
+    container_name: cosmosdb
+    ports:
+      - "8081:8081"    # Data Explorer
+      - "10250:10250"  # SDK
+      - "10251:10251"
+      - "10252:10252"
+      - "10253:10253"
+      - "10254:10254"
+    environment:
+      - AZURE_COSMOS_EMULATOR_PARTITION_COUNT=10
+      - AZURE_COSMOS_EMULATOR_ENABLE_DATA_PERSISTENCE=true
+      - AZURE_COSMOS_EMULATOR_IP_ADDRESS_OVERRIDE=127.0.0.1
+    volumes:
+      - cosmosdb-data:/tmp/cosmos/appdata
+    networks:
+      - agent-network
+    mem_limit: 3g
+    cpu_count: 2
+
+  # OpenTelemetry Collector - Azure Monitor로 전송
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:0.96.0
+    container_name: otel-collector
+    ports:
+      - "4317:4317"    # OTLP gRPC
+      - "4318:4318"    # OTLP HTTP
+      - "8888:8888"    # Prometheus metrics
+    volumes:
+      - ./infra/otel/otel-collector-config.yaml:/etc/otelcol-contrib/config.yaml:ro
+    networks:
+      - agent-network
+    command: ["--config=/etc/otelcol-contrib/config.yaml"]
+
+  # Azure Service Bus Emulator (for async messaging)
+  servicebus-emulator:
+    image: mcr.microsoft.com/azure-messaging/servicebus-emulator:latest
+    container_name: servicebus-emulator
+    ports:
+      - "5672:5672"    # AMQP
+    environment:
+      - ACCEPT_EULA=Y
+      - MSSQL_SA_PASSWORD=YourStrong!Passw0rd
+    volumes:
+      - ./infra/servicebus/Config.json:/ServiceBus_Emulator/ConfigFiles/Config.json:ro
+    networks:
+      - agent-network
+
+volumes:
+  agent-logs:
+  azurite-data:
+  cosmosdb-data:
+
+networks:
+  agent-network:
+    driver: bridge

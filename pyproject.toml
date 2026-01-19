@@ -1,0 +1,80 @@
+[project]
+name = "langgraph-agent-framework"
+version = "0.1.0"
+description = "LangGraph-style AI Agent with Planning-Execution-Reflection-Decision workflow on Azure AI Foundry"
+readme = "README.md"
+requires-python = ">=3.10"
+license = {text = "MIT"}
+authors = [
+    {name = "Your Name", email = "your.email@example.com"}
+]
+keywords = ["ai-agent", "langgraph", "azure", "workflow", "microsoft-foundry"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+]
+
+dependencies = [
+    "agent-framework-azure-ai",
+    "azure-identity",
+    "azure-ai-projects",
+    "azure-core",
+    "pydantic>=2.0.0",
+    "pydantic-settings>=2.0.0",
+    "openai",
+    "python-dotenv",
+    "structlog",
+    "rich",
+    "tenacity",
+    "aiohttp",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest",
+    "pytest-asyncio",
+    "pytest-cov",
+    "black",
+    "ruff",
+    "mypy",
+]
+monitoring = [
+    "azure-monitor-opentelemetry",
+    "opentelemetry-api",
+    "opentelemetry-sdk",
+]
+
+[project.scripts]
+langgraph-agent = "langgraph_agent.main:main"
+
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_functions = ["test_*"]
+
+[tool.black]
+line-length = 120
+target-version = ['py310', 'py311', 'py312']
+
+[tool.ruff]
+line-length = 120
+select = ["E", "F", "W", "I", "N", "UP", "B"]
+ignore = ["E501"]
+
+[tool.mypy]
+python_version = "3.10"
+warn_return_any = true
+warn_unused_configs = true
+ignore_missing_imports = true

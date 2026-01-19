@@ -1,0 +1,94 @@
+# Microsoft Agent Framework - LangGraph Style AI Agent
+# Azure SDK 100% 기반 Planning-Execution-Reflection-Decision 워크플로우
+
+# ============================================
+# Core Agent Framework
+# ============================================
+# agent-framework-azure-ai  # --pre flag required for preview
+
+# ============================================
+# Azure SDK - Core Services
+# ============================================
+azure-identity>=1.15.0
+azure-ai-projects>=1.0.0b1
+azure-core>=1.30.0
+
+# Azure Storage (Blob, Queue, Table)
+azure-storage-blob>=12.19.0
+azure-storage-queue>=12.9.0
+azure-data-tables>=12.5.0
+
+# Azure Cosmos DB (NoSQL)
+azure-cosmos>=4.7.0
+
+# Azure Key Vault (Secrets Management)
+azure-keyvault-secrets>=4.8.0
+
+# Azure Service Bus (Messaging)
+azure-servicebus>=7.12.0
+
+# ============================================
+# Azure AI Services
+# ============================================
+# Azure OpenAI
+openai>=1.0.0
+
+# Azure AI Evaluation (평가 SDK)
+# azure-ai-evaluation>=1.0.0b1
+
+# Azure AI Search (RAG용)
+azure-search-documents>=11.5.0
+
+# Azure AI Content Safety
+azure-ai-contentsafety>=1.0.0
+
+# Token counting
+tiktoken>=0.5.0
+
+# ============================================
+# Azure Monitoring & Observability
+# ============================================
+azure-monitor-opentelemetry>=1.2.0
+azure-monitor-query>=1.2.0
+opentelemetry-api>=1.22.0
+opentelemetry-sdk>=1.22.0
+opentelemetry-instrumentation>=0.43b0
+opentelemetry-instrumentation-aiohttp-client>=0.43b0
+opentelemetry-instrumentation-requests>=0.43b0
+
+# ============================================
+# Workflow and State Management
+# ============================================
+pydantic>=2.0.0
+pydantic-settings>=2.0.0
+
+# ============================================
+# Async Support
+# ============================================
+aiohttp>=3.9.0
+aiofiles>=23.0.0
+
+# ============================================
+# Web Server (Container Apps)
+# ============================================
+fastapi>=0.109.0
+uvicorn[standard]>=0.27.0
+
+# ============================================
+# Testing and Evaluation
+# ============================================
+pytest>=8.0.0
+pytest-asyncio>=0.23.0
+pytest-cov>=4.1.0
+
+# ============================================
+# Utilities
+# ============================================
+python-dotenv>=1.0.0
+structlog>=24.0.0
+rich>=13.0.0
+tenacity>=8.2.0
+
+# Data processing
+pandas>=2.0.0
+numpy>=1.26.0
