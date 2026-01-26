@@ -25,6 +25,8 @@ if TYPE_CHECKING:
 
 class WorkflowStage(str, Enum):
     """현재 워크플로우 단계"""
+    __slots__ = ()  # 메모리 최적화
+
     PLANNING = "planning"
     EXECUTION = "execution"
     REFLECTION = "reflection"
@@ -35,6 +37,8 @@ class WorkflowStage(str, Enum):
 
 class DecisionType(str, Enum):
     """Decision 노드의 결정 유형"""
+    __slots__ = ()  # 메모리 최적화
+
     CONTINUE = "continue"       # 다음 단계로 진행
     RETRY = "retry"             # 현재 단계 재시도
     REPLAN = "replan"           # 계획 재수립
@@ -44,16 +48,9 @@ class DecisionType(str, Enum):
 
 class PlanStep(BaseModel):
     """계획의 개별 단계"""
-    step_id: str = Field(default_factory=lambda: str(uuid4())[:8])
-    step_number: int = Field(description="단계 번호")
-    description: str = Field(description="단계 설명")
-    action: str = Field(description="수행할 액션")
-    expected_output: str = Field(description="예상 출력")
-    dependencies: List[str] = Field(default_factory=list, description="의존하는 이전 단계 ID들")
-    status: str = Field(default="pending", description="단계 상태: pending, in_progress, completed, failed")
 
-    class Config:
-        json_schema_extra = {
+    model_config = {
+        "json_schema_extra": {
             "example": {
                 "step_id": "step_001",
                 "step_number": 1,
@@ -64,6 +61,15 @@ class PlanStep(BaseModel):
                 "status": "pending"
             }
         }
+    }
+
+    step_id: str = Field(default_factory=lambda: str(uuid4())[:8])
+    step_number: int = Field(description="단계 번호")
+    description: str = Field(description="단계 설명")
+    action: str = Field(description="수행할 액션")
+    expected_output: str = Field(description="예상 출력")
+    dependencies: List[str] = Field(default_factory=list, description="의존하는 이전 단계 ID들")
+    status: str = Field(default="pending", description="단계 상태: pending, in_progress, completed, failed")
 
 
 class Plan(BaseModel):

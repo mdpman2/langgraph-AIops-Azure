@@ -110,23 +110,59 @@ def _get_system_prompt(prompt_type: str) -> str:
     return prompts.get(prompt_type, "")
 
 
+# GPT-5.x 모델 감지를 위한 frozenset (O(1) 성능)
+GPT5_MODELS = frozenset({"gpt-5", "gpt-5.1", "gpt-5.2", "gpt-5-mini", "gpt-5-nano", "gpt-5-pro", "model-router"})
+REASONING_MODELS = frozenset({"gpt-5", "gpt-5.1", "gpt-5.2", "o1", "o3", "o3-mini", "o4-mini", "model-router"})
+
+
+def _is_gpt5_model(model_name: str) -> bool:
+    """모델이 GPT-5.x 시리즈인지 확인 - O(1) 최적화"""
+    if not model_name:
+        return False
+    model_lower = model_name.lower()
+    # 1. 직접 매칭 (O(1) frozenset 조회)
+    if model_lower in GPT5_MODELS:
+        return True
+    # 2. 부분 문자열 매칭 (deployment name에 모델명 포함된 경우)
+    return any(m in model_lower for m in GPT5_MODELS)
+
+
 class AzureOpenAIClient:
-    """Azure OpenAI 클라이언트 래퍼"""
+    """Azure OpenAI 클라이언트 래퍼 - GPT-5.x 지원 (2026-01 업데이트)
+
+    최적화:
+    - 비동기 컨텍스트 매니저 지원
+    - 싱글톤 클라이언트 관리
+    - 자동 리소스 정리
+    """
+
+    __slots__ = ('config', '_client', '_credential')
 
     def __init__(self, config: AgentConfig):
         self.config = config
         self._client: Optional[AsyncAzureOpenAI] = None
         self._credential: Optional[DefaultAzureCredential] = None
 
+    async def __aenter__(self) -> "AzureOpenAIClient":
+        """비동기 컨텍스트 매니저 진입"""
+        return self
+
+    async def __aexit__(self, exc_type, exc_val, exc_tb) -> None:
+        """비동기 컨텍스트 매니저 종료 - 자동 리소스 정리"""
+        await self.close()
+
     async def get_client(self) -> AsyncAzureOpenAI:
         """Azure OpenAI 클라이언트 가져오기 (싱글톤)"""
         if self._client is None:
+            # API 버전: config에서 가져오거나 기본값 사용
+            api_version = getattr(self.config, 'azure_openai_api_version', '2024-12-01-preview')
+
             if self.config.azure_openai_api_key:
                 # API 키 사용
                 self._client = AsyncAzureOpenAI(
                     api_key=self.config.azure_openai_api_key,
                     azure_endpoint=self.config.azure_openai_endpoint,
-                    api_version="2024-10-01-preview",
+                    api_version=api_version,
                 )
             else:
                 # DefaultAzureCredential 사용
@@ -138,7 +174,7 @@ class AzureOpenAIClient:
                 self._client = AsyncAzureOpenAI(
                     azure_ad_token_provider=token_provider,
                     azure_endpoint=self.config.azure_openai_endpoint or self.config.azure_foundry_project_endpoint,
-                    api_version="2024-10-01-preview",
+                    api_version=api_version,
                 )
         return self._client
 
@@ -147,19 +183,75 @@ class AzureOpenAIClient:
         messages: List[Dict[str, str]],
         temperature: float = 0.7,
         max_tokens: int = 2000,
+        reasoning_effort: Optional[str] = None,
     ) -> str:
-        """채팅 완성 요청"""
+        """채팅 완성 요청 - GPT-5.x 파라미터 지원"""
         client = await self.get_client()
         deployment = self.config.azure_openai_deployment_name or self.config.azure_foundry_model_deployment
 
-        response = await client.chat.completions.create(
-            model=deployment,
-            messages=messages,
-            temperature=temperature,
-            max_tokens=max_tokens,
-        )
+        # GPT-5.x 모델 감지
+        is_gpt5 = _is_gpt5_model(deployment)
+
+        # 기본 파라미터
+        params = {
+            "model": deployment,
+            "messages": messages,
+            "temperature": temperature,
+        }
+
+        # GPT-5.x 전용 파라미터
+        if is_gpt5:
+            params["max_completion_tokens"] = max_tokens
+            # reasoning_effort 설정 (제공된 경우 또는 config에서)
+            effort = reasoning_effort or getattr(self.config, 'reasoning_effort', 'medium')
+            if effort and effort != 'none':
+                params["reasoning_effort"] = effort
+            logger.info("gpt5_request", model=deployment, reasoning_effort=effort)
+        else:
+            params["max_tokens"] = max_tokens
+
+        response = await client.chat.completions.create(**params)
 
         return response.choices[0].message.content or ""
+
+    async def chat_with_structured_output(
+        self,
+        messages: List[Dict[str, str]],
+        response_schema: Dict[str, Any],
+        temperature: float = 0.3,
+        max_tokens: int = 2000,
+    ) -> Dict[str, Any]:
+        """구조화된 출력 요청 - Structured Outputs (2026 최신)"""
+        client = await self.get_client()
+        deployment = self.config.azure_openai_deployment_name or self.config.azure_foundry_model_deployment
+        is_gpt5 = _is_gpt5_model(deployment)
+
+        params = {
+            "model": deployment,
+            "messages": messages,
+            "temperature": temperature,
+            "response_format": {
+                "type": "json_schema",
+                "json_schema": {
+                    "name": "structured_response",
+                    "strict": True,
+                    "schema": response_schema
+                }
+            }
+        }
+
+        if is_gpt5:
+            params["max_completion_tokens"] = max_tokens
+        else:
+            params["max_tokens"] = max_tokens
+
+        response = await client.chat.completions.create(**params)
+        content = response.choices[0].message.content or "{}"
+
+        try:
+            return json.loads(content)
+        except json.JSONDecodeError:
+            return _extract_json_from_text(content, {})
 
     async def close(self):
         """리소스 정리"""
@@ -170,16 +262,62 @@ class AzureOpenAIClient:
 
 
 # ============================================
-# Planning Node - 계획 수립
+# Structured Output Schemas (2026 최신)
+# ============================================
+
+PLAN_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "goal": {"type": "string", "description": "최종 목표"},
+        "steps": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "step_number": {"type": "integer"},
+                    "description": {"type": "string"},
+                    "action": {"type": "string"},
+                    "expected_output": {"type": "string"}
+                },
+                "required": ["step_number", "description", "action", "expected_output"],
+                "additionalProperties": False
+            }
+        }
+    },
+    "required": ["goal", "steps"],
+    "additionalProperties": False
+}
+
+REFLECTION_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "quality_score": {"type": "number", "minimum": 0, "maximum": 1},
+        "goal_alignment": {"type": "number", "minimum": 0, "maximum": 1},
+        "completeness": {"type": "number", "minimum": 0, "maximum": 1},
+        "strengths": {"type": "array", "items": {"type": "string"}},
+        "weaknesses": {"type": "array", "items": {"type": "string"}},
+        "suggestions": {"type": "array", "items": {"type": "string"}},
+        "needs_retry": {"type": "boolean"},
+        "needs_replan": {"type": "boolean"},
+        "reasoning": {"type": "string"}
+    },
+    "required": ["quality_score", "goal_alignment", "completeness", "needs_retry", "needs_replan", "reasoning"],
+    "additionalProperties": False
+}
+
+
+# ============================================
+# Planning Node - 계획 수립 (Structured Outputs 지원)
 # ============================================
 
 async def planning_node(
     client: AzureOpenAIClient,
     state: AgentState,
-    feedback: Optional[str] = None
+    feedback: Optional[str] = None,
+    use_structured_output: bool = True
 ) -> AgentState:
-    """계획 수립 노드"""
-    logger.info("planning_started", session_id=state.session_id, feedback=feedback)
+    """계획 수립 노드 - Structured Outputs 지원 (2026 최신)"""
+    logger.info("planning_started", session_id=state.session_id, feedback=feedback, structured=use_structured_output)
 
     system_prompt = _get_system_prompt("planning")
     user_prompt = f"사용자 요청: {state.user_request}"
@@ -191,11 +329,22 @@ async def planning_node(
         {"role": "user", "content": user_prompt}
     ]
 
-    response_text = await client.chat(messages)
-
-    # JSON 파싱
-    default_plan = {"goal": state.user_request, "steps": []}
-    plan_data = _extract_json_from_text(response_text, default_plan)
+    # Structured Outputs 사용 여부에 따라 분기
+    if use_structured_output and getattr(client.config, 'use_structured_outputs', True):
+        try:
+            plan_data = await client.chat_with_structured_output(
+                messages=messages,
+                response_schema=PLAN_SCHEMA,
+                temperature=0.5,
+            )
+            logger.info("structured_output_success", node="planning")
+        except Exception as e:
+            logger.warning("structured_output_fallback", error=str(e))
+            response_text = await client.chat(messages, reasoning_effort="medium")
+            plan_data = _extract_json_from_text(response_text, {"goal": state.user_request, "steps": []})
+    else:
+        response_text = await client.chat(messages, reasoning_effort="medium")
+        plan_data = _extract_json_from_text(response_text, {"goal": state.user_request, "steps": []})
 
     # Plan 객체 생성
     steps = []
@@ -314,12 +463,16 @@ async def execution_node(client: AzureOpenAIClient, state: AgentState) -> AgentS
 
 
 # ============================================
-# Reflection Node - 성찰
+# Reflection Node - 성찰 (Structured Outputs 지원)
 # ============================================
 
-async def reflection_node(client: AzureOpenAIClient, state: AgentState) -> AgentState:
-    """성찰 노드"""
-    logger.info("reflection_started", session_id=state.session_id)
+async def reflection_node(
+    client: AzureOpenAIClient,
+    state: AgentState,
+    use_structured_output: bool = True
+) -> AgentState:
+    """성찰 노드 - Structured Outputs 및 고급 추론 지원 (2026 최신)"""
+    logger.info("reflection_started", session_id=state.session_id, structured=use_structured_output)
 
     recent_executions = state.execution_history[-5:] if state.execution_history else []
     system_prompt = _get_system_prompt("reflection")
@@ -344,15 +497,36 @@ async def reflection_node(client: AzureOpenAIClient, state: AgentState) -> Agent
         {"role": "user", "content": user_prompt}
     ]
 
-    response_text = await client.chat(messages)
-
     default_reflection = {
         "quality_score": 0.5,
         "goal_alignment": 0.5,
         "completeness": 0.5,
+        "strengths": [],
+        "weaknesses": [],
+        "suggestions": [],
+        "needs_retry": False,
+        "needs_replan": False,
         "reasoning": "파싱 실패로 기본값 사용"
     }
-    reflection_data = _extract_json_from_text(response_text, default_reflection)
+
+    # Structured Outputs 사용 여부에 따라 분기
+    if use_structured_output and getattr(client.config, 'use_structured_outputs', True):
+        try:
+            reflection_data = await client.chat_with_structured_output(
+                messages=messages,
+                response_schema=REFLECTION_SCHEMA,
+                temperature=0.3,  # 평가는 낮은 temperature
+            )
+            logger.info("structured_output_success", node="reflection")
+        except Exception as e:
+            logger.warning("structured_output_fallback", node="reflection", error=str(e))
+            # Fallback: 고급 추론 사용 (reasoning_effort=high)
+            response_text = await client.chat(messages, reasoning_effort="high")
+            reflection_data = _extract_json_from_text(response_text, default_reflection)
+    else:
+        # 기존 방식 + 고급 추론
+        response_text = await client.chat(messages, reasoning_effort="high")
+        reflection_data = _extract_json_from_text(response_text, default_reflection)
 
     latest_execution = state.get_latest_execution()
     reflection_result = ReflectionResult(

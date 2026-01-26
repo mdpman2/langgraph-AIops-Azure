@@ -33,6 +33,7 @@ class AgentConfig(BaseSettings):
 
     # ============================================
     # Azure AI Foundry Configuration (Primary)
+    # GPT-5.2 via model-router (2026-01 업데이트)
     # ============================================
     azure_foundry_project_endpoint: str = Field(
         default="",
@@ -40,9 +41,28 @@ class AgentConfig(BaseSettings):
         alias="AZURE_FOUNDRY_PROJECT_ENDPOINT"
     )
     azure_foundry_model_deployment: str = Field(
-        default="gpt-4.1",
-        description="Model deployment name in Azure AI Foundry",
+        default="model-router",
+        description="Model deployment name in Azure AI Foundry (model-router for GPT-5.x)",
         alias="AZURE_FOUNDRY_MODEL_DEPLOYMENT"
+    )
+
+    # ============================================
+    # GPT-5.x Model Configuration (2026 최신)
+    # ============================================
+    default_model: str = Field(
+        default="gpt-5.2",
+        description="Default model name for API calls",
+        alias="DEFAULT_MODEL"
+    )
+    reasoning_effort: str = Field(
+        default="medium",
+        description="Reasoning effort for GPT-5.x models (minimal/low/medium/high/xhigh)",
+        alias="REASONING_EFFORT"
+    )
+    use_structured_outputs: bool = Field(
+        default=True,
+        description="Use Structured Outputs for JSON responses",
+        alias="USE_STRUCTURED_OUTPUTS"
     )
 
     # ============================================
@@ -60,9 +80,14 @@ class AgentConfig(BaseSettings):
         repr=False,  # 로그에서 키 숨김
     )
     azure_openai_deployment_name: str = Field(
-        default="gpt-4.1",
-        description="Azure OpenAI deployment name",
+        default="model-router",
+        description="Azure OpenAI deployment name (model-router for GPT-5.x)",
         alias="AZURE_OPENAI_DEPLOYMENT_NAME"
+    )
+    azure_openai_api_version: str = Field(
+        default="2024-12-01-preview",
+        description="Azure OpenAI API version (2024-12-01-preview for AI Foundry)",
+        alias="AZURE_OPENAI_API_VERSION"
     )
 
     # ============================================

@@ -1,17 +1,20 @@
-# Microsoft Agent Framework - LangGraph Style AI Agent
+# Microsoft Agent Framework - LangGraph Style AI Agent v2.0
 # Azure SDK 100% 기반 Planning-Execution-Reflection-Decision 워크플로우
+# 2026-01 업데이트: GPT-5.2, Structured Outputs, Agent Evaluators
 
 # ============================================
 # Core Agent Framework
 # ============================================
 # agent-framework-azure-ai  # --pre flag required for preview
+# Microsoft Agent Framework (선택적)
+# agent-framework>=0.1.0  # pip install agent-framework --pre
 
 # ============================================
 # Azure SDK - Core Services
 # ============================================
-azure-identity>=1.15.0
-azure-ai-projects>=1.0.0b1
-azure-core>=1.30.0
+azure-identity>=1.19.0
+azure-ai-projects>=1.0.0b5
+azure-core>=1.32.0
 
 # Azure Storage (Blob, Queue, Table)
 azure-storage-blob>=12.19.0
@@ -28,33 +31,37 @@ azure-keyvault-secrets>=4.8.0
 azure-servicebus>=7.12.0
 
 # ============================================
-# Azure AI Services
+# Azure AI Services (2026 최신)
 # ============================================
-# Azure OpenAI
-openai>=1.0.0
+# Azure OpenAI - GPT-5.2 지원
+openai>=1.55.0
 
-# Azure AI Evaluation (평가 SDK)
-# azure-ai-evaluation>=1.0.0b1
+# Azure AI Evaluation SDK (Agent Evaluators 포함)
+# IntentResolutionEvaluator, ToolCallAccuracyEvaluator, TaskAdherenceEvaluator
+azure-ai-evaluation>=1.0.0
 
 # Azure AI Search (RAG용)
-azure-search-documents>=11.5.0
+azure-search-documents>=11.6.0
 
 # Azure AI Content Safety
 azure-ai-contentsafety>=1.0.0
 
-# Token counting
-tiktoken>=0.5.0
+# Token counting - GPT-5.x 지원
+tiktoken>=0.8.0
 
 # ============================================
-# Azure Monitoring & Observability
+# Azure Monitoring & Observability (Agent Tracing 지원)
 # ============================================
-azure-monitor-opentelemetry>=1.2.0
-azure-monitor-query>=1.2.0
-opentelemetry-api>=1.22.0
-opentelemetry-sdk>=1.22.0
-opentelemetry-instrumentation>=0.43b0
-opentelemetry-instrumentation-aiohttp-client>=0.43b0
-opentelemetry-instrumentation-requests>=0.43b0
+azure-monitor-opentelemetry>=1.6.0
+azure-monitor-query>=1.4.0
+# OpenTelemetry Agent Spans (Microsoft + Cisco 표준)
+opentelemetry-api>=1.28.0
+opentelemetry-sdk>=1.28.0
+opentelemetry-instrumentation>=0.49b0
+opentelemetry-instrumentation-aiohttp-client>=0.49b0
+opentelemetry-instrumentation-requests>=0.49b0
+# Agent-specific tracing
+opentelemetry-semantic-conventions>=0.49b0
 
 # ============================================
 # Workflow and State Management
