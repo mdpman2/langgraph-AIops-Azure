@@ -1,2 +1,0 @@
-[console_scripts]
-langgraph-agent = langgraph_agent.main:main
